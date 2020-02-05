@@ -1,5 +1,5 @@
 Requirements:
-    - Python 3.6+
+   - Python 3.6+
    
 Deploying the project:
    - Install the required libraries using the following command:
