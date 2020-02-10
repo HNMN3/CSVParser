@@ -1,5 +1,5 @@
-import math
 import csv
+import math
 
 import pandas as pd
 
@@ -86,33 +86,37 @@ def merge_and_store_result(result_data_frames, output_filename):
 def fix_csv():
     with open(CSV_FILE_NAME, 'r') as file:
         lines = list(csv.reader(file))
+    return lines
 
-    # Get max len
-    max_len = 0
-    for line in lines:
-        max_len = max(len(line), max_len)
-
-    # Append extra cols
-    for line in lines:
-        line_len = len(line)
-        extra_cols = [""] * (max_len - line_len)
-        line += extra_cols
-
-    # Write rows
-    with open(CSV_FILE_NAME, 'w') as file:
-        writer = csv.writer(file)
-        writer.writerows(lines)
+    # # Get max len
+    # max_len = 0
+    # for line in lines:
+    #     max_len = max(len(line), max_len)
+    #
+    # # Append extra cols
+    # for line in lines:
+    #     line_len = len(line)
+    #     extra_cols = [""] * (max_len - line_len)
+    #     line += extra_cols
+    #
+    # # Write rows
+    # with open(CSV_FILE_NAME, 'w') as file:
+    #     writer = csv.writer(file)
+    #     writer.writerows(lines)
 
 
 def main(distance_threshold=30):
-    fix_csv()
-    df = pd.read_csv(CSV_FILE_NAME, header=None, error_bad_lines=False)
+    data = fix_csv()
+    df = pd.DataFrame(data)
+    df_obj_cols = df.select_dtypes(['object'])
+    df[df_obj_cols.columns] = df_obj_cols.apply(lambda x: x.str.strip())
+
     column_names = ["frame_id", "face_id", "from_face_coordinates", "genders", "emotions", "emotion_coordinates",
                     "si_coordinates", "not_learning_coordinates", "learning_coordinates", "rh_coordinates",
                     "left_turn_coordinates", "right_turn_coordinates", "st_coordinates", "end_speaking_coordinates",
                     "from_sleeping_coordinates", ]
 
-    pattern = r"^\(\d+ \d+\) \(\d+ \d+\)$"
+    pattern = r"\(\d+ \d+\) \(\d+ \d+\)"
 
     data_frames_step1 = []
     data_frames_step2 = []
@@ -127,8 +131,8 @@ def main(distance_threshold=30):
             frame_id = frame_query[0]
 
         # Get the emotion data
-        emotion_data_index = (list(row[row == "Male"].index) +
-                              list(row[row == "Female"].index))
+        emotion_data_index = (list(row[row.str.find("Male") != -1].index) +
+                              list(row[row.str.find("Female") != -1].index))
         if emotion_data_index:
             # process emotion data
             min_emotion_index = min(emotion_data_index)
@@ -148,10 +152,10 @@ def main(distance_threshold=30):
         si_coordinates = get_values(row, row.str.find("Si ") != -1)
 
         # Get the Not Learning Values
-        not_learning_coordinates = get_values(row, row.str.match("^Not Learning"))
+        not_learning_coordinates = get_values(row, row.str.match("Not Learning"))
 
         # Get the Learning Values
-        learning_coordinates = get_values(row, row.str.match("^Learning"))
+        learning_coordinates = get_values(row, row.str.match("Learning"))
 
         # Get end speaking values
         end_speaking_coordinates = get_values(row, row.str.match(pattern))
@@ -169,10 +173,10 @@ def main(distance_threshold=30):
         rh_coordinates = get_values(row, row.str.find("Rh ") != -1)
 
         # Get the Left turn coordinates
-        left_turn_coordinates = get_values(row, row[row == "Left turn"].index + 1)
+        left_turn_coordinates = get_values(row, row[row.str.find("Left turn") != -1].index + 1)
 
         # Get the Right turn coordinates
-        right_turn_coordinates = get_values(row, row[row == "Right turn"].index + 1)
+        right_turn_coordinates = get_values(row, row[row.str.find("Right turn") != -1].index + 1)
 
         # Get the ST coordinates
         st_coordinates = get_values(row, row.str.find("st coordinates") != -1)
