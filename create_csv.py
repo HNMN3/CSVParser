@@ -1,12 +1,34 @@
 import csv
+from collections import defaultdict
+from datetime import datetime
 import sys
+
+
+def write_data(data, fram_count, subject, timestamp, writer):
+    date_fmt = "%a %b  %d %H:%M:%S %Y"
+    try:
+        assert timestamp
+        datetime_obj = datetime.strptime(timestamp, date_fmt)
+        date = datetime_obj.strftime('%d-%m-%Y')
+        time = datetime_obj.strftime('%H:%M:%S')
+    except (AssertionError, ValueError):
+        date, time = None, None
+
+    while any(data):
+        row = [fram_count]
+        for var in data:
+            row.append(var.pop(0) if var else None)
+        row.append(subject)
+        row.append(date)
+        row.append(time)
+        writer.writerow(row)
 
 
 def main(input_file_name):
     file_obj = open(input_file_name)
     out_file_obj = open('output.csv', 'w')
     field_names = ['fram_count', 'faces', 'face_name', 'head_pose', 'emotion',
-                   'action', ]
+                   'action', 'subject', 'date', 'time']
     writer = csv.writer(out_file_obj)
     writer.writerow(field_names)
 
@@ -22,6 +44,8 @@ def main(input_file_name):
         head_poses = list()
         emotions = list()
         actions = list()
+        subject = None
+        timestamp = None
         for val in values:
             if not prev_val:
                 prev_val = val
@@ -30,12 +54,10 @@ def main(input_file_name):
             if 'faces' in val:
                 data = [faces, face_names, head_poses, emotions, actions]
                 if fram_count:
-                    while any(data):
-                        row = [fram_count]
-                        for var in data:
-                            row.append(var.pop(0) if var else None)
-                        writer.writerow(row)
+                    write_data(data, fram_count, subject, timestamp, writer)
                     fram_count = None
+                    subject = None
+                    timestamp = None
                 faces.append(prev_val)
                 key = 'faces'
             elif 'fram_count' in val:
@@ -52,16 +74,18 @@ def main(input_file_name):
             elif 'emotion' in val:
                 emotions.append(prev_val)
                 key = 'emotion'
+            elif 'subject' in val:
+                subject = prev_val
+                key = 'subject'
+            elif 'time' in val:
+                timestamp = prev_val
+                key = 'time'
             else:
                 key = ''
             prev_val = val[len(key):]
 
         data = [faces, face_names, head_poses, emotions, actions]
-        while any(data):
-            row = [fram_count]
-            for var in data:
-                row.append(var.pop(0) if var else None)
-            writer.writerow(row)
+        write_data(data, fram_count, subject, timestamp, writer)
 
     out_file_obj.close()
     print("CSV file saved!!")
