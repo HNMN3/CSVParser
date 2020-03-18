@@ -1,7 +1,12 @@
 import csv
-from collections import defaultdict
 from datetime import datetime
+
+import pandas as pd
 import sys
+
+# Update below variables to change the name of output files
+CSV_OUTPUT_FILE_NAME = 'output.csv'
+STATS_OUTPUT_FILE_NAME = 'statistics.csv'
 
 
 def write_data(data, fram_count, subject, timestamp, writer):
@@ -26,7 +31,7 @@ def write_data(data, fram_count, subject, timestamp, writer):
 
 def main(input_file_name):
     file_obj = open(input_file_name)
-    out_file_obj = open('output.csv', 'w')
+    out_file_obj = open(CSV_OUTPUT_FILE_NAME, 'w')
     field_names = ['fram_count', 'faces', 'face_name', 'head_pose', 'emotion',
                    'action', 'subject', 'date', 'time']
     writer = csv.writer(out_file_obj)
@@ -89,6 +94,42 @@ def main(input_file_name):
 
     out_file_obj.close()
     print("CSV file saved!!")
+    prepare_statistics()
+
+
+def prepare_statistics():
+    # Reading file with parsed date time
+    df = pd.read_csv(CSV_OUTPUT_FILE_NAME, parse_dates={'timestamp': ["date", "time"]})
+    df = df[df.timestamp != 'nan nan']  # Removing rows with null date time
+    df['timestamp_hour'] = (pd.to_datetime(df.timestamp)
+                            .apply(lambda x: x.replace(minute=0, second=0)))
+    fdf = df.groupby(['face_name', 'timestamp_hour']).apply(group_values)
+    fdf.reset_index(drop=True).to_csv(STATS_OUTPUT_FILE_NAME, index=False)
+    print("Statistics saved!!")
+
+
+def group_values(df):
+    face_name, day_time = df.name
+    keys_to_evaluate = ['head_pose', 'emotion', 'action', ]
+    final_data = {'total_fram': [len(df)],
+                  'face_name': [face_name],
+                  'subject': [df.subject.reset_index(drop=True)[0]],
+                  'day_time': [day_time]}
+    max_len = 1
+    for key in keys_to_evaluate:
+        stats = df[key].value_counts()
+        stats_list = []
+        for stat_key, stat_val in zip(stats.index, stats):
+            stats_list.append('{}, {} time(s)'.format(stat_key, stat_val))
+        final_data[key] = stats_list
+        max_len = max(max_len, len(stats_list))
+    columns = ['total_fram', 'face_name'] + keys_to_evaluate + ['subject', 'day_time']
+    for col in columns:
+        curr_size = len(final_data[col])
+        if curr_size < max_len:
+            padding = max_len - curr_size
+            final_data[col] += [''] * padding
+    return pd.DataFrame(final_data, columns=columns)
 
 
 if __name__ == '__main__':
